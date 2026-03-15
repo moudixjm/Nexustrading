@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEXUS | Trading Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/zustand@4.4.1/dist/index.umd.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        
+        body {
+            background: #0a0a0a;
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+        
+        .gradient-text {
+            background: linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .gradient-border {
+            position: relative;
+            background: #0a0a0a;
+            border-radius: 12px;
+        }
+        
+        .gradient-border::before {
+            content: '';
+            position: absolute;
+            inset: -1px;
+            border-radius: 12px;
+            padding: 1px;
+            background: linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+        }
+        
+        .glow {
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.15), 0 0 40px rgba(124, 58, 237, 0.1);
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 212, 255, 0.3);
+        }
+        
+        .input-field {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .input-field:focus {
+            border-color: #00d4ff;
+            box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
+        }
+        
+        .nav-item {
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-item::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: linear-gradient(90deg, #00d4ff, #7c3aed);
+            transition: width 0.3s ease;
+        }
+        
+        .nav-item:hover::after,
+        .nav-item.active::after {
+            width: 100%;
+        }
+        
+        .price-up { color: #10b981; }
+        .price-down { color: #ef4444; }
+        
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+        
+        .animate-pulse-glow {
+            animation: pulse-glow 2s ease-in-out infinite;
+        }
+        
+        .hidden { display: none !important; }
+        
+        #canvas-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.3;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas-bg"></canvas>
+    
+    <div id="app">
+        <!-- Auth Screen -->
+        <div id="auth-screen" class="min-h-screen flex items-center justify-center p-4">
+            <div class="w-full max-w-md">
+                <div class="text-center mb-8">
+                    <h1 class="text-5xl font-bold gradient-text mb-2">NEXUS</h1>
+                    <p class="text-gray-400">Paper Trading. Real Competition.</p>
+                </div>
+                
+                <div class="gradient-border p-8">
+                    <div class="flex gap-4 mb-6">
+                        <button onclick="authManager.setMode('login')" id="tab-login" class="flex-1 py-2 text-center rounded-lg transition-all bg-white/10 text-white">Login</button>
+                        <button onclick="authManager.setMode('register')" id="tab-register" class="flex-1 py-2 text-center rounded-lg transition-all text-gray-400 hover:text-white">Register</button>
+                    </div>
+                    
+                    <form id="auth-form" class="space-y-4">
+                        <div id="username-field" class="hidden">
+                            <label class="block text-sm text-gray-400 mb-1">Username</label>
+                            <input type="text" id="username" class="input-field w-full px-4 py-3 rounded-lg text-white placeholder-gray-500" placeholder="trader123">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Email</label>
+                            <input type="email" id="email" class="input-field w-full px-4 py-3 rounded-lg text-white placeholder-gray-500" placeholder="you@example.com">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Password</label>
+                            <input type="password" id="password" class="input-field w-full px-4 py-3 rounded-lg text-white placeholder-gray-500" placeholder="••••••••">
+                        </div>
+                        
+                        <button type="submit" class="btn-primary w-full py-3 rounded-lg font-semibold text-white mt-6">
+                            <span id="auth-btn-text">Sign In</span>
+                        </button>
+                    </form>
+                    
+                    <div id="auth-error" class="mt-4 text-red-400 text-sm text-center hidden"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main App -->
+        <div id="main-app" class="hidden min-h-screen">
+            <!-- Navigation -->
+            <nav class="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-md border-b border-white/10">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="flex items-center justify-between h-16">
+                        <div class="flex items-center gap-8">
+                            <span class="text-2xl font-bold gradient-text">NEXUS</span>
+                            <div class="hidden md:flex items-center gap-6">
+                                <button onclick="router.navigate('dashboard')" class="nav-item text-gray-300 hover:text-white" data-route="dashboard">Dashboard</button>
+                                <button onclick="router.navigate('trade')" class="nav-item text-gray-300 hover:text-white" data-route="trade">Trade</button>
+                                <button onclick="router.navigate('competitions')" class="nav-item text-gray-300 hover:text-white" data-route="competitions">Competitions</button>
+                                <button onclick="router.navigate('portfolio')" class="nav-item text-gray-300 hover:text-white" data-route="portfolio">Portfolio</button>
+                                <button onclick="router.navigate('wallet')" class="nav-item text-gray-300 hover:text-white" data-route="wallet">Wallet</button>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center gap-4">
+                            <div class="text-right hidden sm:block">
+                                <div class="text-sm text-gray-400">Balance</div>
+                                <div class="font-semibold mono" id="nav-balance">$0.00</div>
+                            </div>
+                            <button onclick="authManager.logout()" class="text-gray-400 hover:text-white">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- Main Content -->
+            <main class="pt-20 pb-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+                <!-- Dashboard View -->
+                <div id="view-dashboard" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="card rounded-xl p-6 glow">
+                            <div class="text-gray-400 text-sm mb-1">Portfolio Value</div>
+                            <div class="text-3xl font-bold mono" id="portfolio-value">$10,000.00</div>
+                            <div class="text-sm mt-2" id="portfolio-change">
+                                <span class="price-up">+2.4%</span>
+                                <span class="text-gray-500 ml-2">+$240.00</span>
+                            </div>
+                        </div>
+                        
+                        <div class="card rounded-xl p-6 glow">
+                            <div class="text-gray-400 text-sm mb-1">Available Balance</div>
+                            <div class="text-3xl font-bold mono" id="available-balance">$0.00</div>
+                            <div class="text-sm mt-2 text-gray-500">Ready to trade</div>
+                        </div>
+                        
+                        <div class="card rounded-xl p-6 glow">
+                            <div class="text-gray-400 text-sm mb-1">Active Competitions</div>
+                            <div class="text-3xl font-bold mono" id="active-competitions">0</div>
+                            <div class="text-sm mt-2 text-gray-500">Rankings updated live</div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="lg:col-span-2 card rounded-xl p-6">
+                            <h3 class="text-xl font-semibold mb-4">Market Overview</h3>
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4" id="market-tickers">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+                        
+                        <div class="card rounded-xl p-6">
+                            <h3 class="text-xl font-semibold mb-4">Quick Trade</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">Symbol</label>
+                                    <input type="text" id="quick-symbol" class="input-field w-full px-3 py-2 rounded-lg text-white uppercase" placeholder="AAPL" maxlength="5">
+                                </div>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <button onclick="quickTrade('buy')" class="btn-primary py-2 rounded-lg font-medium">Buy</button>
+                                    <button onclick="quickTrade('sell')" class="bg-red-500/20 border border-red-500/50 text-red-400 py-2 rounded-lg font-medium hover:bg-red-500/30 transition-all">Sell</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card rounded-xl p-6">
+                        <h3 class="text-xl font-semibold mb-4">Live Competitions</h3>
+                        <div id="competitions-list" class="space-y-4">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Trade View -->
+                <div id="view-trade" class="hidden space-y-6">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="lg:col-span-2 space-y-6">
+                            <div class="card rounded-xl p-6">
+                                <div class="flex items-center justify-between mb-4">
+                                    <h3 class="text-xl font-semibold">Chart</h3>
+                                    <div class="flex gap-2">
+                                        <button class="px-3 py-1 text-sm rounded bg-white/10 text-white">1D</button>
+                                        <button class="px-3 py-1 text-sm rounded text-gray-400 hover:text-white">1W</button>
+                                        <button class="px-3 py-1 text-sm rounded text-gray-400 hover:text-white">1M</button>
+                                    </div>
+                                </div>
+                                <div id="chart-container" class="h-96 bg-black/50 rounded-lg flex items-center justify-center">
+                                    <div class="text-gray-500">Select a symbol to view chart</div>
+                                </div>
+                            </div>
+                            
+                            <div class="card rounded-xl p-6">
+                                <h3 class="text-xl font-semibold mb-4">Order Book</h3>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <div class="text-sm text-gray-400 mb-2">Bids</div>
+                                        <div id="order-book-bids" class="space-y-1 text-sm mono">
+                                            <!-- Populated by JS -->
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="text-sm text-gray-400 mb-2">Asks</div>
+                                        <div id="order-book-asks" class="space-y-1 text-sm mono">
+                                            <!-- Populated by JS -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-6">
+                            <div class="card rounded-xl p-6">
+                                <h3 class="text-xl font-semibold mb-4">Place Order</h3>
+                                <form id="trade-form" class="space-y-4">
+                                    <div>
+                                        <label class="block text-sm text-gray-400 mb-1">Symbol</label>
+                                        <input type="text" id="trade-symbol" class="input-field w-full px-3 py-2 rounded-lg text-white uppercase" placeholder="AAPL">
+                                    </div>
+                                    
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <button type="button" onclick="setTradeSide('buy')" id="side-buy" class="py-2 rounded-lg font-medium bg-green-500/20 border border-green-500/50 text-green-400">Buy</button>
+                                        <button type="button" onclick="setTradeSide('sell')" id="side-sell" class="py-2 rounded-lg font-medium bg-red-500/20 border border-red-500/50 text-red-400">Sell</button>
+                                    </div>
+                                    
+                                    <div>
+                                        <label class="block text-sm text-gray-400 mb-1">Quantity</label>
+                                        <input type="number" id="trade-quantity" class="input-field w-full px-3 py-2 rounded-lg text-white" placeholder="100" step="0.01">
+                                    </div>
+                                    
+                                    <div>
+                                        <label class="block text-sm text-gray-400 mb-1">Price (USD)</label>
+                                        <input type="number" id="trade-price" class="input-field w-full px-3 py-2 rounded-lg text-white" placeholder="150.00" step="0.01">
+                                    </div>
+                                    
+                                    <div class="pt-2 border-t border-white/10">
+                                        <div class="flex justify-between text-sm mb-1">
+                                            <span class="text-gray-400">Total</span>
+                                            <span class="mono" id="trade-total">$0.00</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <button type="submit" class="btn-primary w-full py-3 rounded-lg font-semibold text-white">
+                                        Place Order
+                                    </button>
+                                </form>
+                            </div>
+
+                            <div class="card rounded-xl p-6">
+                                <h3 class="text-xl font-semibold mb-4">Watchlist</h3>
+                                <div id="watchlist" class="space-y-2">
+                                    <div class="flex items-center justify-between p-3 rounded-lg bg-white/5 cursor-pointer hover:bg-white/10 transition-all" onclick="selectSymbol('AAPL')">
+                                        <div>
+                                            <div class="font-medium">AAPL</div>
+                                            <div class="text-sm text-gray-400">Apple Inc.</div>
+                                        </div>
+                                        <div class="text-right">
+                                            <div class="mono" id="price-AAPL">--</div>
+                                            <div class="text-sm price-up" id="change-AAPL">--</div>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between p-3 rounded-lg bg-white/5 cursor-pointer hover:bg-white/10 transition-all" onclick="selectSymbol('TSLA')">
+                                        <div>
+                                            <div class="font-medium">TSLA</div>
+                                            <div class="text-sm text-gray-400">Tesla Inc.</div>
+                                        </div>
+                                        <div class="text-right">
+                                            <div class="mono" id="price-TSLA">--</div>
+                                            <div class="text-sm price-down" id="change-TSLA">--</div>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between p-3 rounded-lg bg-white/5 cursor-pointer hover:bg-white/10 transition-all" onclick="selectSymbol('BTC')">
+                                        <div>
+                                            <div class="font-medium">BTC</div>
+                                            <div class="text-sm text-gray-400">Bitcoin USD</div>
+                                        </div>
+                                        <div class="text-right">
+                                            <div class="mono" id="price-BTC">--</div>
+                                            <div class="text-sm price-up" id="change-BTC">--</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Competitions View -->
+                <div id="view-competitions" class="hidden space-y-6">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-3xl font-bold">Trading Competitions</h2>
+                        <div class="flex gap-3">
+                            <button class="px-4 py-2 rounded-lg bg-white/10 text-white text-sm">All</button>
+                            <button class="px-4 py-2 rounded-lg text-gray-400 text-sm hover:text-white">Active</button>
+                            <button class="px-4 py-2 rounded-lg text-gray-400 text-sm hover:text-white">My Entries</button>
+                        </div>
+                    </div>
+
+                    <div id="competitions-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <!-- Populated by JS -->
+                    </div>
+
+                    <div class="card rounded-xl p-6">
+                        <h3 class="text-xl font-semibold mb-4">Leaderboard</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead>
+                                    <tr class="text-left text-gray-400 border-b border-white/10">
+                                        <th class="pb-3 font-medium">Rank</th>
+                                        <th class="pb-3 font-medium">Trader</th>
+                                        <th class="pb-3 font-medium">Competition</th>
+                                        <th class="pb-3 font-medium text-right">Return</th>
+                                        <th class="pb-3 font-medium text-right">Prize</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="leaderboard-body" class="text-sm">
+                                    <!-- Populated by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Portfolio View -->
+                <div id="view-portfolio" class="hidden space-y-6">
+                    <h2 class="text-3xl font-bold">Your Portfolio</h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="card rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4">Holdings</h3>
+                            <div id="holdings-list" class="space-y-3">
+                                <div class="text-gray-500 text-center py-8">No positions yet. Start trading!</div>
+                            </div>
+                        </div>
+                        
+                        <div class="card rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4">Recent Trades</h3>
+                            <div id="trades-list" class="space-y-3 max-h-96 overflow-y-auto">
+                                <div class="text-gray-500 text-center py-8">No trades yet.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card rounded-xl p-6">
+                        <h3 class="text-lg font-semibold mb-4">Performance</h3>
+                        <div class="h-64 bg-black/30 rounded-lg flex items-center justify-center">
+                            <div class="text-gray-500">Performance chart coming soon</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Wallet View -->
+                <div id="view-wallet" class="hidden space-y-6">
+                    <h2 class="text-3xl font-bold">Wallet</h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="card rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4">Deposit</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">Amount (USD)</label>
+                                    <input type="number" id="deposit-amount" class="input-field w-full px-3 py-2 rounded-lg text-white" placeholder="100" step="0.01">
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">Cryptocurrency</label>
+                                    <select id="deposit-currency" class="input-field w-full px-3 py-2 rounded-lg text-white bg-transparent">
+                                        <option value="BTC">Bitcoin (BTC)</option>
+                                        <option value="ETH">Ethereum (ETH)</option>
+                                        <option value="USDT">Tether (USDT)</option>
+                                    </select>
+                                </div>
+                                <button onclick="createDeposit()" class="btn-primary w-full py-3 rounded-lg font-semibold text-white">
+                                    Generate Payment Address
+                                </button>
+                            </div>
+                            
+                            <div id="deposit-info" class="hidden mt-4 p-4 rounded-lg bg-white/5">
+                                <div class="text-sm text-gray-400 mb-2">Send payment to:</div>
+                                <div class="mono text-sm break-all" id="deposit-address"></div>
+                                <div class="mt-2 text-sm">Amount: <span class="mono" id="deposit-crypto-amount"></span></div>
+                            </div>
+                        </div>
+                        
+                        <div class="card rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4">Withdraw</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">Amount (USD)</label>
+                                    <input type="number" id="withdraw-amount" class="input-field w-full px-3 py-2 rounded-lg text-white" placeholder="100" step="0.01">
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">Crypto Address</label>
+                                    <input type="text" id="withdraw-address" class="input-field w-full px-3 py-2 rounded-lg text-white" placeholder="bc1q...">
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">Network</label>
+                                    <select id="withdraw-network" class="input-field w-full px-3 py-2 rounded-lg text-white bg-transparent">
+                                        <option value="BTC">Bitcoin</option>
+                                        <option value="ETH">Ethereum (ERC20)</option>
+                                        <option value="TRX">Tron (TRC20)</option>
+                                    </select>
+                                </div>
+                                <button onclick="createWithdrawal()" class="bg-red-500/20 border border-red-500/50 text-red-400 w-full py-3 rounded-lg font-semibold hover:bg-red-500/30 transition-all">
+                                    Request Withdrawal
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card rounded-xl p-6">
+                        <h3 class="text-lg font-semibold mb-4">Transaction History</h3>
+                        <div id="transaction-history" class="space-y-3">
+                            <div class="text-gray-500 text-center py-8">No transactions yet.</div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // API Configuration
+        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000' : '';
+        
+        // Store
+        const { createStore } = window.zustand;
+        
+        const useStore = createStore((set, get) => ({
+            user: null,
+            token: localStorage.getItem('nexus_token'),
+            balance: 0,
+            positions: [],
+            trades: [],
+            competitions: [],
+            marketData: {},
+            currentView: 'dashboard',
+            
+            setUser: (user) => set({ user, balance: user?.balance || 0 }),
+            setToken: (token) => {
+                localStorage.setItem('nexus_token', token);
+                set({ token });
+            },
+            setBalance: (balance) => set({ balance }),
+            setPositions: (positions) => set({ positions }),
+            setTrades: (trades) => set({ trades }),
+            setCompetitions: (competitions) => set({ competitions }),
+            updateMarketData: (symbol, data) => set((state) => ({
+                marketData: { ...state.marketData, [symbol]: data }
+            })),
+            setCurrentView: (view) => set({ currentView: view }),
+            logout: () => {
+                localStorage.removeItem('nexus_token');
+                set({ user: null, token: null, balance: 0 });
+            }
+        }));
+
+        // Auth Manager
+        const authManager = {
+            mode: 'login',
+            
+            setMode: (mode) => {
+                authManager.mode = mode;
+                document.getElementById('tab-login').className = mode === 'login' ? 'flex-1 py-2 text-center rounded-lg transition-all bg-white/10 text-white' : 'flex-1 py-2 text-center rounded-lg transition-all text-gray-400 hover:text-white';
+                document.getElementById('tab-register').className = mode === 'register' ? 'flex-1 py-2 text-center rounded-lg transition-all bg-white/10 text-white' : 'flex-1 py-2 text-center rounded-lg transition-all text-gray-400 hover:text-white';
+                document.getElementById('username-field').classList.toggle('hidden', mode === 'login');
+                document.getElementById('auth-btn-text').textContent = mode === 'login' ? 'Sign In' : 'Create Account';
+                document.getElementById('auth-error').classList.add('hidden');
+            },
+            
+            handleSubmit: async (e) => {
+                e.preventDefault();
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                const username = document.getElementById('username').value;
+                
+                try {
+                    const endpoint = authManager.mode === 'login' ? '/api/auth/login' : '/api/auth/register';
+                    const body = authManager.mode === 'login' ? { email, password } : { email, password, username };
+                    
+                    const res = await fetch(`${API_URL}${endpoint}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(body)
+                    });
+                    
+                    const data = await res.json();
+                    
+                    if (!res.ok) throw new Error(data.error);
+                    
+                    useStore.getState().setToken(data.token);
+                    useStore.getState().setUser(data.user);
+                    router.showApp();
+                } catch (err) {
+                    document.getElementById('auth-error').textContent = err.message;
+                    document.getElementById('auth-error').classList.remove('hidden');
+                }
+            },
+            
+            logout: () => {
+                useStore.getState().logout();
+                router.showAuth();
+            },
+            
+            checkAuth: async () => {
+                const token = useStore.getState().token;
+                if (!token) return;
+                
+                try {
+                    const res = await fetch(`${API_URL}/api/user/profile`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    
+                    if (res.ok) {
+                        const user = await res.json();
+                        useStore.getState().setUser(user);
+                        router.showApp();
+                    } else {
+                        useStore.getState().logout();
+                    }
+                } catch (err) {
+                    console.error('Auth check failed:', err);
+                }
+            }
+        };
+
+        // Router
+        const router = {
+            navigate: (view) => {
+                useStore.getState().setCurrentView(view);
+                
+                // Hide all views
+                document.querySelectorAll('[id^="view-"]').forEach(el => el.classList.add('hidden'));
+                document.getElementById(`view-${view}`).classList.remove('hidden');
+                
+                // Update nav
+                document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+                document.querySelector(`[data-route="${view}"]`)?.classList.add('active');
+                
+                // Load view data
+                if (view === 'dashboard') loadDashboard();
+                if (view === 'competitions') loadCompetitions();
+                if (view === 'portfolio') loadPortfolio();
+                if (view === 'wallet') loadWallet();
+            },
+            
+            showAuth: () => {
+                document.getElementById('auth-screen').classList.remove('hidden');
+                document.getElementById('main-app').classList.add('hidden');
+            },
+            
+            showApp: () => {
+                document.getElementById('auth-screen').classList.add('hidden');
+                document.getElementById('main-app').classList.remove('hidden');
+                router.navigate('dashboard');
+            }
+        };
+        // Trading Functions
+        let currentTradeSide = 'buy';
+        
+        function setTradeSide(side) {
+            currentTradeSide = side;
+            document.getElementById('side-buy').className = side === 'buy' ? 'py-2 rounded-lg font-medium bg-green-500/20 border border-green-500/50 text-green-400' : 'py-2 rounded-lg font-medium bg-white/5 border border-white/10 text-gray-400';
+            document.getElementById('side-sell').className = side === 'sell' ? 'py-2 rounded-lg font-medium bg-red-500/20 border border-red-500/50 text-red-400' : 'py-2 rounded-lg font-medium bg-white/5 border border-white/10 text-gray-400';
+        }
+        
+        function selectSymbol(symbol) {
+            document.getElementById('trade-symbol').value = symbol;
+            document.getElementById('quick-symbol').value = symbol;
+        }
+        
+        function quickTrade(side) {
+            const symbol = document.getElementById('quick-symbol').value.toUpperCase();
+            if (!symbol) return alert('Enter a symbol');
+            selectSymbol(symbol);
+            setTradeSide(side);
+            router.navigate('trade');
+        }
+        
+        async function submitTrade(e) {
+            e.preventDefault();
+            const token = useStore.getState().token;
+            if (!token) return;
+            
+            const symbol = document.getElementById('trade-symbol').value.toUpperCase();
+            const quantity = parseFloat(document.getElementById('trade-quantity').value);
+            const price = parseFloat(document.getElementById('trade-price').value);
+            
+            if (!symbol || !quantity || !price) return alert('Fill all fields');
+            
+            try {
+                const res = await fetch(`${API_URL}/api/trade`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ symbol, side: currentTradeSide, quantity, price })
+                });
+                
+                const data = await res.json();
+                
+                if (!res.ok) throw new Error(data.error);
+                
+                useStore.getState().setBalance(data.newBalance);
+                alert('Trade executed successfully!');
+                loadPortfolio();
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+        
+        // Data Loading
+        async function loadDashboard() {
+            const token = useStore.getState().token;
+            if (!token) return;
+            
+            try {
+                const [portfolioRes, compsRes] = await Promise.all([
+                    fetch(`${API_URL}/api/portfolio`, { headers: { 'Authorization': `Bearer ${token}` } }),
+                    fetch(`${API_URL}/api/competitions`)
+                ]);
+                
+                if (portfolioRes.ok) {
+                    const portfolio = await portfolioRes.json();
+                    useStore.getState().setPositions(portfolio.positions);
+                    useStore.getState().setTrades(portfolio.recentTrades);
+                    updatePortfolioDisplay();
+                }
+                
+                if (compsRes.ok) {
+                    const comps = await compsRes.json();
+                    useStore.getState().setCompetitions(comps);
+                    renderCompetitions(comps.slice(0, 3));
+                }
+            } catch (err) {
+                console.error('Dashboard load failed:', err);
+            }
+        }
+        
+        async function loadCompetitions() {
+            try {
+                const res = await fetch(`${API_URL}/api/competitions`);
+                if (res.ok) {
+                    const comps = await res.json();
+                    renderCompetitionsGrid(comps);
+                }
+            } catch (err) {
+                console.error('Competitions load failed:', err);
+            }
+        }
+        
+        async function loadPortfolio() {
+            const token = useStore.getState().token;
+            if (!token) return;
+            
+            try {
+                const res = await fetch(`${API_URL}/api/portfolio`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    renderHoldings(data.positions);
+                    renderTrades(data.recentTrades);
+                }
+            } catch (err) {
+                console.error('Portfolio load failed:', err);
+            }
+        }
+        
+        async function loadWallet() {
+            // Load transaction history
+            const token = useStore.getState().token;
+            if (!token) return;
+            
+            document.getElementById('nav-balance').textContent = `$${parseFloat(useStore.getState().balance).toFixed(2)}`;
+        }
+        
+        // Render Functions
+        function updatePortfolioDisplay() {
+            const positions = useStore.getState().positions;
+            const balance = useStore.getState().balance;
+            
+            let totalValue = balance;
+            positions.forEach(p => {
+                const price = useStore.getState().marketData[p.symbol]?.price || p.avg_price;
+                totalValue += parseFloat(p.quantity) * price;
+            });
+            
+            document.getElementById('portfolio-value').textContent = `$${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+            document.getElementById('available-balance').textContent = `$${parseFloat(balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+        }
+        
+        function renderCompetitions(comps) {
+            const container = document.getElementById('competitions-list');
+            if (!comps.length) {
+                container.innerHTML = '<div class="text-gray-500 text-center py-4">No active competitions</div>';
+                return;
+            }
+            
+            container.innerHTML = comps.map(comp => `
+                <div class="flex items-center justify-between p-4 rounded-lg bg-white/5">
+                    <div>
+                        <div class="font-semibold">${comp.name}</div>
+                        <div class="text-sm text-gray-400">Entry: $${comp.entry_fee} | Prize Pool: $${comp.prize_pool}</div>
+                    </div>
+                    <button onclick="joinCompetition('${comp.id}')" class="btn-primary px-4 py-2 rounded-lg text-sm font-medium">
+                        Join
+                    </button>
+                </div>
+            `).join('');
+        }
+        
+        function renderCompetitionsGrid(comps) {
+            const container = document.getElementById('competitions-grid');
+            container.innerHTML = comps.map(comp => `
+                <div class="card rounded-xl p-6 glow">
+                    <div class="flex items-start justify-between mb-4">
+                        <div>
+                            <h3 class="text-lg font-semibold">${comp.name}</h3>
+                            <p class="text-sm text-gray-400 mt-1">${comp.description || 'Trading competition'}</p>
+                        </div>
+                        <span class="px-2 py-1 rounded text-xs bg-green-500/20 text-green-400">${comp.status}</span>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-4 text-sm">
+                        <div>
+                            <div class="text-gray-400">Entry Fee</div>
+                            <div class="font-semibold">$${comp.entry_fee}</div>
+                        </div>
+                        <div>
+                            <div class="text-gray-400">Prize Pool</div>
+                            <div class="font-semibold text-green-400">$${comp.prize_pool}</div>
+                        </div>
+                        <div>
+                            <div class="text-gray-400">Starting Balance</div>
+                            <div class="font-semibold">$${comp.starting_balance}</div>
+                        </div>
+                        <div>
+                            <div class="text-gray-400">Ends</div>
+                            <div class="font-semibold">${new Date(comp.end_date).toLocaleDateString()}</div>
+                        </div>
+                    </div>
+                    
+                    <button onclick="joinCompetition('${comp.id}')" class="btn-primary w-full py-2 rounded-lg font-medium">
+                        Join Competition
+                    </button>
+                </div>
+            `).join('');
+        }
+        
+        function renderHoldings(positions) {
+            const container = document.getElementById('holdings-list');
+            if (!positions.length) {
+                container.innerHTML = '<div class="text-gray-500 text-center py-8">No positions yet. Start trading!</div>';
+                return;
+            }
+            
+            container.innerHTML = positions.map(pos => `
+                <div class="flex items-center justify-between p-3 rounded-lg bg-white/5">
+                    <div>
+                        <div class="font-medium">${pos.symbol}</div>
+                        <div class="text-sm text-gray-400">${pos.quantity} shares @ $${pos.avg_price}</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="mono">$${(pos.quantity * pos.avg_price).toFixed(2)}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function renderTrades(trades) {
+            const container = document.getElementById('trades-list');
+            if (!trades.length) {
+                container.innerHTML = '<div class="text-gray-500 text-center py-8">No trades yet.</div>';
+                return;
+            }
+            
+            container.innerHTML = trades.map(trade => `
+                <div class="flex items-center justify-between p-3 rounded-lg bg-white/5 text-sm">
+                    <div class="flex items-center gap-3">
+                        <span class="px-2 py-1 rounded text-xs ${trade.side === 'buy' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}">${trade.side.toUpperCase()}</span>
+                        <div>
+                            <div class="font-medium">${trade.symbol}</div>
+                            <div class="text-gray-400">${new Date(trade.created_at).toLocaleDateString()}</div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="mono">${trade.quantity} @ $${trade.price}</div>
+                        <div class="text-gray-400">$${trade.total}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // Actions
+        async function joinCompetition(compId) {
+            const token = useStore.getState().token;
+            if (!token) return alert('Please login first');
+            
+            try {
+                const res = await fetch(`${API_URL}/api/competitions/join`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ competitionId: compId })
+                });
+                
+                const data = await res.json();
+                
+                if (!res.ok) throw new Error(data.error);
+                
+                alert('Successfully joined competition!');
+                loadDashboard();
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+        
+        async function createDeposit() {
+            const token = useStore.getState().token;
+            const amount = document.getElementById('deposit-amount').value;
+            const currency = document.getElementById('deposit-currency').value;
+            
+            if (!amount || amount <= 0) return alert('Enter valid amount');
+            
+            try {
+                const res = await fetch(`${API_URL}/api/payments/create`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ amount, currency })
+                });
+                
+                const data = await res.json();
+                
+                if (!res.ok) throw new Error(data.error);
+                
+                document.getElementById('deposit-address').textContent = data.payAddress;
+                document.getElementById('deposit-crypto-amount').textContent = `${data.payAmount} ${data.payCurrency}`;
+                document.getElementById('deposit-info').classList.remove('hidden');
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+        
+        async function createWithdrawal() {
+            const token = useStore.getState().token;
+            const amount = document.getElementById('withdraw-amount').value;
+            const address = document.getElementById('withdraw-address').value;
+            const network = document.getElementById('withdraw-network').value;
+            
+            if (!amount || !address) return alert('Fill all fields');
+            
+            try {
+                const res = await fetch(`${API_URL}/api/withdraw`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ amount, address, network })
+                });
+                
+                const data = await res.json();
+                
+                if (!res.ok) throw new Error(data.error);
+                
+                alert('Withdrawal request submitted!');
+                document.getElementById('withdraw-amount').value = '';
+                document.getElementById('withdraw-address').value = '';
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+        
+        // Canvas Background
+        function initCanvas() {
+            const canvas = document.getElementById('canvas-bg');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            const particles = [];
+            for (let i = 0; i < 50; i++) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    vx: (Math.random() - 0.5) * 0.5,
+                    vy: (Math.random() - 0.5) * 0.5,
+                    size: Math.random() * 2
+                });
+            }
+            
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                particles.forEach(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    
+                    if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+                    if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+                    
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(0, 212, 255, 0.5)';
+                    ctx.fill();
+                });
+                
+                requestAnimationFrame(animate);
+            }
+            
+            animate();
+            
+            window.addEventListener('resize', () => {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            });
+        }
+        
+        // Event Listeners
+        document.getElementById('auth-form').addEventListener('submit', authManager.handleSubmit);
+        document.getElementById('trade-form').addEventListener('submit', submitTrade);
+        
+        document.getElementById('trade-quantity').addEventListener('input', () => {
+            const qty = parseFloat(document.getElementById('trade-quantity').value) || 0;
+            const price = parseFloat(document.getElementById('trade-price').value) || 0;
+            document.getElementById('trade-total').textContent = `$${(qty * price).toFixed(2)}`;
+        });
+        
+        document.getElementById('trade-price').addEventListener('input', () => {
+            const qty = parseFloat(document.getElementById('trade-quantity').value) || 0;
+            const price = parseFloat(document.getElementById('trade-price').value) || 0;
+            document.getElementById('trade-total').textContent = `$${(qty * price).toFixed(2)}`;
+        });
+        
+        // Initialize
+        initCanvas();
+        authManager.checkAuth();
+        
+        // Subscribe to store changes
+        useStore.subscribe((state) => {
+            document.getElementById('nav-balance').textContent = `$${parseFloat(state.balance).toFixed(2)}`;
+        });
+    </script>
+</body>
+</html>
