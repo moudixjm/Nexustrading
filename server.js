@@ -24,14 +24,19 @@ app.use(express.static('public'));
 // Database
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
 // Redis
 const redisClient = redis.createClient({
-  url: process.env.REDIS_URL || 'redis://localhost:6379'
+  url: process.env.REDIS_URL || 'redis://localhost:6379',
+  socket: {
+    tls: process.env.REDIS_URL?.includes('railway'),
+    rejectUnauthorized: false
+  }
 });
-redisClient.connect().catch(console.error);
 
 // Auth Middleware
 const authenticateToken = async (req, res, next) => {
