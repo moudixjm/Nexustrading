@@ -1,8 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const { Pool } = require('pg');
-const redis = require('redis');
+const sqlite3 = require('sqlite3').verbose();
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const WebSocket = require('ws');
@@ -21,22 +20,59 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// Database
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false
+// SQLite Database (file-based, no server needed)
+const db = new sqlite3.Database('./nexus.db', (err) => {
+  if (err) {
+    console.error('Error opening database:', err);
+  } else {
+    console.log('Connected to SQLite database');
+    initDatabase();
   }
 });
 
-// Redis
-const redisClient = redis.createClient({
-  url: process.env.REDIS_URL || 'redis://localhost:6379',
-  socket: {
-    tls: process.env.REDIS_URL?.includes('railway'),
-    rejectUnauthorized: false
-  }
-});
+// Create tables if they don't exist
+function initDatabase() {
+  db.run(`CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    email TEXT UNIQUE,
+    password TEXT,
+    username TEXT UNIQUE,
+    balance REAL DEFAULT 100000,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+  
+  db.run(`CREATE TABLE IF NOT EXISTS positions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT,
+    symbol TEXT,
+    quantity INTEGER,
+    avg_price REAL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+  
+  db.run(`CREATE TABLE IF NOT EXISTS trades (
+    id TEXT PRIMARY KEY,
+    user_id TEXT,
+    symbol TEXT,
+    side TEXT,
+    quantity INTEGER,
+    price REAL,
+    total REAL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+  
+  console.log('Database tables initialized');
+}
+
+// Mock Redis (in-memory object)
+const redisClient = {
+  get: (key) => Promise.resolve(null),
+  set: (key, value) => Promise.resolve('OK'),
+  setEx: (key, seconds, value) => Promise.resolve('OK'),
+  connect: () => Promise.resolve(),
+  on: () => {}
+};
+
 
 // Auth Middleware
 const authenticateToken = async (req, res, next) => {
